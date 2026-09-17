@@ -31,6 +31,8 @@ For a local demo, set `DEMO_MODE=true`; this seeds representative data and allow
 
 For production, set `DEMO_MODE=false` and configure `OBSERVABILITY_API_KEY`. All non-health API routes require this value in the `X-API-Key` header. The dashboard receives only the API URL and API key; it never receives the Supabase service-role key.
 
+GitHub Actions runs compilation and tests on pushes and pull requests.
+
 ## Repository layout
 
 ```text
@@ -74,7 +76,7 @@ The service-role key must remain server-side and must never be exposed in Stream
 {"service":"advisor-brief-agent","cases":[{"score":0.9},{"score":0.8}]}
 ```
 
-The first run establishes a baseline. Later runs compare scores using `REGRESSION_TOLERANCE`. Alerts are persisted and can be queried through `GET /api/alerts`.
+The first run establishes a baseline. Later runs compare scores using `REGRESSION_TOLERANCE`. Alerts are persisted and can be queried through `GET /api/alerts`. Resolve an alert with `POST /api/alerts/{alert_id}/resolve`; trace queries support `limit` and `offset` pagination.
 
 ## Scheduler
 

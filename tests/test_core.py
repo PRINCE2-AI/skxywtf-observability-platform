@@ -3,6 +3,9 @@ from observability.evaluation import parse_judge_json
 from observability.models import EvalResult
 from observability.regression import BaselineManager
 from observability.repositories import InMemoryRepository
+from observability.models import TraceContext
+from observability.sdk import trace_llm
+from uuid import uuid4
 
 
 def test_cost_estimation() -> None:
@@ -33,3 +36,25 @@ def test_invalid_judge_json_is_rejected() -> None:
         assert "valid JSON" in str(error)
     else:
         raise AssertionError("Expected invalid JSON to raise")
+
+
+def test_trace_pagination_and_correlation_id() -> None:
+    repository = InMemoryRepository()
+    trace_id = uuid4()
+    with trace_llm(repository, "svc", "one", "llama3.2:8b", TraceContext(), trace_id):
+        pass
+    with trace_llm(repository, "svc", "two", "llama3.2:8b", TraceContext(), trace_id):
+        pass
+    assert repository.list_traces(limit=1, offset=1)[0].task == "one"
+    assert repository.traces[0].trace_id == trace_id
+    assert repository.traces[1].trace_id == trace_id
+
+
+def test_alert_can_be_resolved() -> None:
+    repository = InMemoryRepository()
+    manager = BaselineManager(repository, tolerance=0.10)
+    manager.set_baseline("svc", {"quality": 0.90})
+    alerts = manager.detect_and_store("svc", EvalResult(service="svc", evaluator="test", scores={"quality": 0.70}))
+    resolved = repository.update_alert_status(str(alerts[0].id), "resolved")
+    assert resolved is not None
+    assert resolved.status == "resolved"

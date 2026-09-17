@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
@@ -62,8 +62,12 @@ def health() -> dict:
 
 
 @app.get("/api/traces", dependencies=[Depends(require_api_key)])
-def get_traces(service: str | None = None, limit: Annotated[int, Query(ge=1, le=1000)] = 200) -> list[dict]:
-    return [trace.model_dump(mode="json") for trace in repository.list_traces(limit, service)]
+def get_traces(
+    service: str | None = None,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> list[dict]:
+    return [trace.model_dump(mode="json") for trace in repository.list_traces(limit, offset, service)]
 
 
 @app.post("/api/traces", dependencies=[Depends(require_api_key)], responses={500: {"description": "Trace was not persisted"}})
@@ -112,3 +116,11 @@ def set_baseline(service: str, result: EvalResult) -> dict:
 @app.get("/api/alerts", dependencies=[Depends(require_api_key)])
 def get_alerts(status: str | None = None) -> list[dict]:
     return [alert.model_dump(mode="json") for alert in repository.list_alerts(status)]
+
+
+@app.post("/api/alerts/{alert_id}/resolve", dependencies=[Depends(require_api_key)])
+def resolve_alert(alert_id: str, status: Literal["resolved", "open"] = "resolved") -> dict:
+    alert = repository.update_alert_status(alert_id, status)
+    if alert is None:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return alert.model_dump(mode="json")

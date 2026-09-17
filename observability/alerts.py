@@ -23,5 +23,5 @@ def send_regression_alerts(alerts: Iterable[RegressionAlert], api_key: str = "",
             "text": f"Quality regression detected:\n{summary}",
         })
         return True
-    except (ImportError, RuntimeError):
+    except Exception:
         return False

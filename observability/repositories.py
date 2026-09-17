@@ -12,13 +12,14 @@ class RepositoryError(RuntimeError):
 
 class Repository(Protocol):
     def save_trace(self, trace: TraceEvent) -> TraceEvent: ...
-    def list_traces(self, limit: int = 200, service: str | None = None) -> list[TraceEvent]: ...
+    def list_traces(self, limit: int = 200, offset: int = 0, service: str | None = None) -> list[TraceEvent]: ...
     def save_eval(self, result: EvalResult) -> EvalResult: ...
     def list_evals(self, service: str | None = None) -> list[EvalResult]: ...
     def set_baseline(self, service: str, scores: dict[str, float]) -> None: ...
     def get_baseline(self, service: str) -> dict[str, float] | None: ...
     def save_alert(self, alert: RegressionAlert) -> RegressionAlert: ...
     def list_alerts(self, status: str | None = None) -> list[RegressionAlert]: ...
+    def update_alert_status(self, alert_id: str, status: str) -> RegressionAlert | None: ...
 
 
 class InMemoryRepository:
@@ -32,9 +33,10 @@ class InMemoryRepository:
         self.traces.append(trace)
         return trace
 
-    def list_traces(self, limit: int = 200, service: str | None = None) -> list[TraceEvent]:
+    def list_traces(self, limit: int = 200, offset: int = 0, service: str | None = None) -> list[TraceEvent]:
         values = [t for t in self.traces if not service or t.service == service]
-        return list(reversed(values[-limit:]))
+        values = list(reversed(values))
+        return values[offset:offset + limit]
 
     def save_eval(self, result: EvalResult) -> EvalResult:
         self.evals.append(result)
@@ -55,6 +57,13 @@ class InMemoryRepository:
 
     def list_alerts(self, status: str | None = None) -> list[RegressionAlert]:
         return [a for a in self.alerts if not status or a.status == status]
+
+    def update_alert_status(self, alert_id: str, status: str) -> RegressionAlert | None:
+        for alert in self.alerts:
+            if str(alert.id) == alert_id:
+                alert.status = status
+                return alert
+        return None
 
 
 class SupabaseRepository(InMemoryRepository):
@@ -77,8 +86,8 @@ class SupabaseRepository(InMemoryRepository):
         self._execute(self.client.table("llm_traces").insert(payload))
         return trace
 
-    def list_traces(self, limit: int = 200, service: str | None = None) -> list[TraceEvent]:
-        query = self.client.table("llm_traces").select("*").order("created_at", desc=True).limit(limit)
+    def list_traces(self, limit: int = 200, offset: int = 0, service: str | None = None) -> list[TraceEvent]:
+        query = self.client.table("llm_traces").select("*").order("created_at", desc=True).range(offset, offset + limit - 1)
         if service:
             query = query.eq("service", service)
         data = self._execute(query).data or []
@@ -112,6 +121,12 @@ class SupabaseRepository(InMemoryRepository):
             query = query.eq("status", status)
         data = self._execute(query).data or []
         return [RegressionAlert.model_validate(item) for item in data]
+
+    def update_alert_status(self, alert_id: str, status: str) -> RegressionAlert | None:
+        data = self._execute(
+            self.client.table("regression_alerts").update({"status": status}).eq("id", alert_id).select("*")
+        ).data or []
+        return RegressionAlert.model_validate(data[0]) if data else None
 
 
 def build_repository(settings: Any) -> Repository:

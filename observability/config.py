@@ -1,4 +1,3 @@
-from functools import lru_cache
 import os
 from dataclasses import dataclass
 
@@ -40,6 +39,5 @@ class Settings:
         return bool(self.supabase_url and self.supabase_service_role_key)
 
 
-@lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings.from_env()

@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from contextlib import AbstractContextManager
 from typing import Any
+from uuid import UUID, uuid4
 
 from .cost import estimate_cost
 from .models import TraceContext, TraceEvent
@@ -17,12 +18,14 @@ class TraceHandle(AbstractContextManager["TraceHandle"]):
         task: str,
         model: str,
         context: TraceContext | dict[str, Any] | None = None,
+        trace_id: UUID | None = None,
     ) -> None:
         self.repository = repository
         self.service = service
         self.task = task
         self.model = model
         self.context = context.model_dump() if isinstance(context, TraceContext) else (context or {})
+        self.trace_id = trace_id or uuid4()
         self.started = time.perf_counter()
         self.first_token_at: float | None = None
         self.input_tokens: int | None = None
@@ -59,6 +62,7 @@ class TraceHandle(AbstractContextManager["TraceHandle"]):
             error_type=type(exc).__name__ if exc else None,
             error_message=(str(exc)[:497] + "...") if exc and len(str(exc)) > 500 else (str(exc) if exc else None),
             context=self.context,
+            trace_id=self.trace_id,
         )
         self.event = self.repository.save_trace(event)
         return False
@@ -70,8 +74,9 @@ def trace_llm(
     task: str,
     model: str,
     context: TraceContext | dict[str, Any] | None = None,
+    trace_id: UUID | None = None,
 ) -> TraceHandle:
-    return TraceHandle(repository, service, task, model, context)
+    return TraceHandle(repository, service, task, model, context, trace_id)
 
 
 def _read_tokens(value: Any, key: str) -> int | None:
