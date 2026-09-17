@@ -49,6 +49,10 @@ class TraceHandle(AbstractContextManager["TraceHandle"]):
         self.error = exc
         elapsed_ms = int((time.perf_counter() - self.started) * 1000)
         ttfb_ms = int((self.first_token_at - self.started) * 1000) if self.first_token_at else None
+        error_message = None
+        if exc:
+            message = str(exc)
+            error_message = message[:497] + "..." if len(message) > 500 else message
         event = TraceEvent(
             service=self.service,
             task=self.task,
@@ -60,7 +64,7 @@ class TraceHandle(AbstractContextManager["TraceHandle"]):
             ttfb_ms=ttfb_ms,
             success=exc is None,
             error_type=type(exc).__name__ if exc else None,
-            error_message=(str(exc)[:497] + "...") if exc and len(str(exc)) > 500 else (str(exc) if exc else None),
+            error_message=error_message,
             context=self.context,
             trace_id=self.trace_id,
         )
