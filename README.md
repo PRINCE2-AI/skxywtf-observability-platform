@@ -27,7 +27,9 @@ Open `http://localhost:8095/docs` for the API. Start the dashboard in another te
 streamlit run dashboard/app.py
 ```
 
-The default `DEMO_MODE=true` seeds representative data and works without API keys.
+For a local demo, set `DEMO_MODE=true`; this seeds representative data and allows protected API routes without an API key. The safe application default is `DEMO_MODE=false`.
+
+For production, set `DEMO_MODE=false` and configure `OBSERVABILITY_API_KEY`. All non-health API routes require this value in the `X-API-Key` header. The dashboard receives only the API URL and API key; it never receives the Supabase service-role key.
 
 ## Repository layout
 

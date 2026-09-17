@@ -57,7 +57,7 @@ class TraceHandle(AbstractContextManager["TraceHandle"]):
             ttfb_ms=ttfb_ms,
             success=exc is None,
             error_type=type(exc).__name__ if exc else None,
-            error_message=str(exc)[:500] if exc else None,
+            error_message=(str(exc)[:497] + "...") if exc and len(str(exc)) > 500 else (str(exc) if exc else None),
             context=self.context,
         )
         self.event = self.repository.save_trace(event)

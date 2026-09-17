@@ -24,14 +24,27 @@ class EvaluationRunner:
         return self.repository.save_eval(result)
 
     def run_ragas_evaluation(self, service: str, test_cases: list[dict[str, Any]]) -> EvalResult:
-        """Run RAGAS when installed; otherwise return an explicit demo result."""
+        """Run RAGAS when installed; otherwise label the result as a demo fallback."""
         try:
-            import ragas  # noqa: F401
+            from datasets import Dataset
+            from ragas import evaluate
+            from ragas.metrics import answer_relevancy, context_precision, context_recall, faithfulness
         except ImportError:
             result = self.run_sample_evaluation(service, test_cases)
             result.evaluator = "ragas-unavailable-demo"
             return result
-        return self.run_sample_evaluation(service, test_cases)
+        if not test_cases:
+            raise ValueError("RAGAS evaluation requires at least one test case")
+        dataset = Dataset.from_list(test_cases)
+        scores = evaluate(dataset, metrics=[faithfulness, answer_relevancy, context_recall, context_precision])
+        result = EvalResult(
+            service=service,
+            evaluator="ragas",
+            scores={name: float(scores[name]) for name in ("faithfulness", "answer_relevancy", "context_recall", "context_precision")},
+            sample_count=len(test_cases),
+            metadata={"mode": "ragas"},
+        )
+        return self.repository.save_eval(result)
 
     def run_judge_evaluation(self, service: str, outputs: list[dict[str, Any]]) -> EvalResult:
         result = self.run_sample_evaluation(service, outputs)

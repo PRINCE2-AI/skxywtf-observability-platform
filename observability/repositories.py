@@ -6,6 +6,10 @@ from typing import Any, Protocol
 from .models import EvalResult, RegressionAlert, TraceEvent
 
 
+class RepositoryError(RuntimeError):
+    """Raised when the backing persistence service cannot complete an operation."""
+
+
 class Repository(Protocol):
     def save_trace(self, trace: TraceEvent) -> TraceEvent: ...
     def list_traces(self, limit: int = 200, service: str | None = None) -> list[TraceEvent]: ...
@@ -61,45 +65,52 @@ class SupabaseRepository(InMemoryRepository):
         from supabase import create_client
         self.client = create_client(url, service_role_key)
 
+    @staticmethod
+    def _execute(query: Any) -> Any:
+        try:
+            return query.execute()
+        except Exception as exc:
+            raise RepositoryError("Persistence service unavailable") from exc
+
     def save_trace(self, trace: TraceEvent) -> TraceEvent:
         payload = trace.model_dump(mode="json")
-        self.client.table("llm_traces").insert(payload).execute()
+        self._execute(self.client.table("llm_traces").insert(payload))
         return trace
 
     def list_traces(self, limit: int = 200, service: str | None = None) -> list[TraceEvent]:
         query = self.client.table("llm_traces").select("*").order("created_at", desc=True).limit(limit)
         if service:
             query = query.eq("service", service)
-        data = query.execute().data or []
+        data = self._execute(query).data or []
         return [TraceEvent.model_validate(item) for item in data]
 
     def save_eval(self, result: EvalResult) -> EvalResult:
-        self.client.table("eval_results").insert(result.model_dump(mode="json")).execute()
+        self._execute(self.client.table("eval_results").insert(result.model_dump(mode="json")))
         return result
 
     def list_evals(self, service: str | None = None) -> list[EvalResult]:
         query = self.client.table("eval_results").select("*").order("run_at", desc=True)
         if service:
             query = query.eq("service", service)
-        data = query.execute().data or []
+        data = self._execute(query).data or []
         return [EvalResult.model_validate(item) for item in data]
 
     def set_baseline(self, service: str, scores: dict[str, float]) -> None:
-        self.client.table("eval_baselines").upsert({"service": service, "scores": scores}).execute()
+        self._execute(self.client.table("eval_baselines").upsert({"service": service, "scores": scores}))
 
     def get_baseline(self, service: str) -> dict[str, float] | None:
-        data = self.client.table("eval_baselines").select("scores").eq("service", service).limit(1).execute().data or []
+        data = self._execute(self.client.table("eval_baselines").select("scores").eq("service", service).limit(1)).data or []
         return data[0]["scores"] if data else None
 
     def save_alert(self, alert: RegressionAlert) -> RegressionAlert:
-        self.client.table("regression_alerts").insert(alert.model_dump(mode="json")).execute()
+        self._execute(self.client.table("regression_alerts").insert(alert.model_dump(mode="json")))
         return alert
 
     def list_alerts(self, status: str | None = None) -> list[RegressionAlert]:
         query = self.client.table("regression_alerts").select("*").order("created_at", desc=True)
         if status:
             query = query.eq("status", status)
-        data = query.execute().data or []
+        data = self._execute(query).data or []
         return [RegressionAlert.model_validate(item) for item in data]
 
 

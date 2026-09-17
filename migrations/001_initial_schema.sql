@@ -60,3 +60,15 @@ create table if not exists llm_audit_log (
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
+
+alter table llm_traces enable row level security;
+alter table eval_results enable row level security;
+alter table eval_baselines enable row level security;
+alter table regression_alerts enable row level security;
+alter table llm_audit_log enable row level security;
+
+create policy "authenticated observability read" on llm_traces for select to authenticated using (true);
+create policy "authenticated observability read" on eval_results for select to authenticated using (true);
+create policy "authenticated observability read" on eval_baselines for select to authenticated using (true);
+create policy "authenticated observability read" on regression_alerts for select to authenticated using (true);
+create policy "authenticated observability read" on llm_audit_log for select to authenticated using (true);

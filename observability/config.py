@@ -18,6 +18,7 @@ class Settings:
     observability_port: int = 8095
     demo_mode: bool = True
     redaction_enabled: bool = True
+    api_key: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -29,8 +30,9 @@ class Settings:
             founder_email=os.getenv("FOUNDER_EMAIL", ""),
             regression_tolerance=float(os.getenv("REGRESSION_TOLERANCE", "0.10")),
             observability_port=int(os.getenv("OBSERVABILITY_PORT", "8095")),
-            demo_mode=os.getenv("DEMO_MODE", "true").lower() == "true",
+            demo_mode=os.getenv("DEMO_MODE", "false").lower() == "true",
             redaction_enabled=os.getenv("REDACTION_ENABLED", "true").lower() == "true",
+            api_key=os.getenv("OBSERVABILITY_API_KEY", ""),
         )
 
     @property

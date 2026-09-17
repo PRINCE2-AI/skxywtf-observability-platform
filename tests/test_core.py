@@ -7,6 +7,7 @@ from observability.repositories import InMemoryRepository
 
 def test_cost_estimation() -> None:
     assert estimate_cost("claude-sonnet-4-6", 1000, 500) == 0.0105
+    assert estimate_cost("unconfigured-model", 1000, 500) == 0.0
 
 
 def test_trace_repository_and_regression() -> None:
